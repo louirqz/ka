@@ -15,14 +15,17 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json({ limit: '20mb' }));
 
 // Initialize GoogleGenAI server-side with telemetry header
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build'
+const getAiClient = () => {
+  if (!process.env.GEMINI_API_KEY) return null;
+  return new GoogleGenAI({
+    apiKey: process.env.GEMINI_API_KEY,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build'
+      }
     }
-  }
-});
+  });
+};
 
 // API endpoint for general Gemini prompt
 app.post('/api/gemini/generate', async (req, res) => {
@@ -32,7 +35,8 @@ app.post('/api/gemini/generate', async (req, res) => {
       return res.status(400).json({ error: 'Prompt is required' });
     }
 
-    if (!process.env.GEMINI_API_KEY) {
+    const ai = getAiClient();
+    if (!ai) {
       return res.json({
         text: 'API Key not configured on server. Fallback response generated.'
       });
@@ -57,9 +61,10 @@ app.post('/api/gemini/generate', async (req, res) => {
 // AI Skin Tone analysis route with Gemini vision if image is provided
 app.post('/api/analyze/skin', async (req, res) => {
   try {
-    const { imageBase64, quiz } = req.body;
+    const { imageBase64 } = req.body;
+    const ai = getAiClient();
 
-    if (process.env.GEMINI_API_KEY && imageBase64) {
+    if (ai && imageBase64) {
       try {
         const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
         const prompt = `Analyze this face photo for personal color and skin tone undertone.
@@ -139,4 +144,8 @@ async function startServer() {
   });
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+export default app;
